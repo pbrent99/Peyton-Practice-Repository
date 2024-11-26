@@ -1,41 +1,84 @@
 # Building functions
-calculate_avg_expression_nested <- function(exprs_mtx, cluster_gene_sets) {
-  
+calculate_avg_expression_nested <- function(exprs_mtx, cluster_gene_sets) { # May need to change
+  # Initializing empty list
   cluster_avg_expr <- list()
   
   for (cluster_id in names(cluster_gene_sets)) {
-    
+    # Extracting GO pathways for each cluster
     gene_sets <- cluster_gene_sets[[cluster_id]]
     
+# Initializing empty list
     pathway_avg <- list()
-    
-    for (gene_set_name in names(gene_sets)) {
-      gene_set <- gene_sets[[gene_set_name]]
+
+for (gene_set_name in names(gene_sets)) {
+
+# Extracting the genes associated with each gene set (GO pathway)
+gene_set <- gene_sets[[gene_set_name]]
+
+# Perform intersection
+genes_in_intersection <- intersect(gene_set, rownames(exprs_mtx))
       
-      # Perform intersection
-      genes_in_intersection <- intersect(gene_set, rownames(exprs_mtx))
-      
-      # Check if the intersection is non-empty
-      if (length(genes_in_intersection) > 0) {
-        exprs_mtx_fil <- exprs_mtx[genes_in_intersection, , drop = FALSE]  # Keep as data frame
-        avg_exprs_pathway <- rowMeans(exprs_mtx_fil)
-        overall_avg_expr <- mean(avg_exprs_pathway, na.rm = TRUE)  # Handle NA values if any
-        pathway_avg[[gene_set_name]] <- overall_avg_expr
-      } else {
-        message("No matching genes found for gene set: ", gene_set_name)
-      }
+# Check if the intersection is non-empty
+if (length(genes_in_intersection) > 0) {
+exprs_mtx_fil <- exprs_mtx[genes_in_intersection, , drop = FALSE]  # Keep as data frame
+# Calculating average gene expression for each gene
+avg_exprs_pathway <- rowMeans(exprs_mtx_fil)
+
+# Calculating overall average for all genes
+# This is because we want to see the average expression for an entire pathway
+overall_avg_expr <- mean(avg_exprs_pathway, na.rm = TRUE)  # Handle NA values if any
+
+# Adding average expression of each pathway to this previously initialized empty list
+pathway_avg[[gene_set_name]] <- overall_avg_expr
+} else {
+message("No matching genes found for gene set: ", gene_set_name) # Generating diagnostic message
     }
-    
-    cluster_avg_expr[[cluster_id]] <- pathway_avg
   }
-  
-  return(cluster_avg_expr)
+# Adding average expression of each pathway to this previously initialized empty list
+# What makes this different from "pathway_avg" is that we're now adding based on cluster ID and not pathway name
+# Essentially they are the same thing though
+cluster_avg_expr[[cluster_id]] <- pathway_avg
+ }
+return(cluster_avg_expr) # This will return a list of list (nested list)
 }
 
+### EDITING HERE
+top_20_GOBP_pathways <- lapply(cluster_avg_expr, function(pathway) {
+  filtered_pathways <- pathway %>% dplyr::filter(grepl("GOBP", Description))
+  return(filtered_pathways)
+})
 
-for (cluster_name in names(top_20_pathways_converted)) {
+top_20_GOBP_pathways_IDs <- sapply(top_20_GOBP_pathways, function(pathway) {
+  geneID <- as.character(pathway$geneID)
+  strsplit(geneID, split = "/")
+})
 
-  if (cluster_name %in% names(pathway_names)) {
+# Initializing empty list
+top_20_pathways_converted <- list()
+
+for (cluster_name in names(top_20_GOBP_pathways_IDs)) {
+  cluster_entrez_ids <- top_20_GOBP_pathways_IDs[[cluster_name]]
+  converted <- lapply(cluster_entrez_ids, function(entrez_list) {
+    entrez_list <- as.character(entrez_list)
+    mapIds(
+      org.Hs.eg.db,
+      keys = entrez_list,
+      column = "SYMBOL",
+      keytype = "ENTREZID"
+    )
+  })
+top_20_pathways_converted[[cluster_name]] <- converted
+}
+
+# Extracting just the GOBP pathway names
+pathway_names <- sapply(top_20_GOBP_pathways, function(pathway) {
+  filtered_pathway <- pathway %>% dplyr::filter(grepl("GOBP", Description))
+  return(filtered_pathway$Description)
+})
+
+# Re-naming to show GOBP pathway names
+for(cluster_name in names(top_20_pathways_converted)) {
+  if(cluster_name %in% names(pathway_names)) {
     names(top_20_pathways_converted[[cluster_name]]) <- pathway_names[[cluster_name]]
   } else {
     message(paste("No pathway names found for cluster:", cluster_name))
