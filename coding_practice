@@ -1,0 +1,43 @@
+# Building functions
+calculate_avg_expression_nested <- function(exprs_mtx, cluster_gene_sets) {
+  
+  cluster_avg_expr <- list()
+  
+  for (cluster_id in names(cluster_gene_sets)) {
+    
+    gene_sets <- cluster_gene_sets[[cluster_id]]
+    
+    pathway_avg <- list()
+    
+    for (gene_set_name in names(gene_sets)) {
+      gene_set <- gene_sets[[gene_set_name]]
+      
+      # Perform intersection
+      genes_in_intersection <- intersect(gene_set, rownames(exprs_mtx))
+      
+      # Check if the intersection is non-empty
+      if (length(genes_in_intersection) > 0) {
+        exprs_mtx_fil <- exprs_mtx[genes_in_intersection, , drop = FALSE]  # Keep as data frame
+        avg_exprs_pathway <- rowMeans(exprs_mtx_fil)
+        overall_avg_expr <- mean(avg_exprs_pathway, na.rm = TRUE)  # Handle NA values if any
+        pathway_avg[[gene_set_name]] <- overall_avg_expr
+      } else {
+        message("No matching genes found for gene set: ", gene_set_name)
+      }
+    }
+    
+    cluster_avg_expr[[cluster_id]] <- pathway_avg
+  }
+  
+  return(cluster_avg_expr)
+}
+
+
+for (cluster_name in names(top_20_pathways_converted)) {
+
+  if (cluster_name %in% names(pathway_names)) {
+    names(top_20_pathways_converted[[cluster_name]]) <- pathway_names[[cluster_name]]
+  } else {
+    message(paste("No pathway names found for cluster:", cluster_name))
+  }
+}
