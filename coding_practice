@@ -90,8 +90,13 @@ calculate_avg_expression_nested <- function(exprs_mtx) {
   
   top_20_pathways_GOBP <- lapply(top_20_pathways, function(pathway) {
     filtered_pathways <- pathway %>% dplyr::filter(grepl("GOBP", Description))
+    if (nrow(filtered_pathways) == 0) {
+      return(NULL)
+    }
     return(filtered_pathways)
   })
+  
+  top_20_pathways_GOBP <- top_20_pathways_GOBP[!sapply(top_20_pathways_GOBP, is.null)]
   
   top_20_pathways_IDs <- sapply(top_20_pathways_GOBP, function(pathway) {
     geneID <- as.character(pathway$geneID)
@@ -114,34 +119,37 @@ calculate_avg_expression_nested <- function(exprs_mtx) {
   }
   
   cluster_avg_expr <- list()
-
-for (cluster_id in names(top_20_pathways_converted)) {
-  gene_sets <- top_20_pathways_converted[[cluster_id]]
-  pathway_avg <- list()
   
-  for (gene_set_name in names(gene_sets)) {
-    gene_set <- gene_sets[[gene_set_name]]
-    genes_in_intersection <- intersect(gene_set, rownames(exprs_mtx))
+  for (cluster_id in names(top_20_pathways_converted)) {
+    gene_sets <- top_20_pathways_converted[[cluster_id]]
+    pathway_avg <- list()
     
-    if (length(genes_in_intersection) > 0) {
-      exprs_mtx_fil <- exprs_mtx[genes_in_intersection, , drop = FALSE]
-      avg_exprs_pathway <- rowMeans(exprs_mtx_fil)
-      overall_avg_expr <- mean(avg_exprs_pathway, na.rm = TRUE)
-      pathway_avg[[gene_set_name]] <- overall_avg_expr
+    for (gene_set_ind in 1:length(gene_sets)) {
+      gene_set <- gene_sets[[gene_set_ind]]
+      
+      genes_in_intersection <- intersect(gene_set, rownames(exprs_mtx))
+      
+      gene_set_name <- paste0("Gene_Set_", gene_set_ind)
+      
+      if (length(genes_in_intersection) > 0) {
+        exprs_mtx_fil <- exprs_mtx[genes_in_intersection, , drop = FALSE]
+        avg_exprs_pathway <- rowMeans(exprs_mtx_fil)
+        overall_avg_expr <- mean(avg_exprs_pathway, na.rm = TRUE)
+        pathway_avg[[gene_set_name]] <- overall_avg_expr
+      } else {
+        message("No matching genes found for gene set: ", gene_set_name)
+      }
+    }
+    
+    if (length(pathway_avg) > 0) {
+      cluster_avg_expr[[cluster_id]] <- pathway_avg
     } else {
-      message("No matching genes found for gene set: ", gene_set_name)
+      message("No gene sets processed for cluster: ", cluster_id)
     }
   }
   
-  if (length(pathway_avg) > 0) {
-    cluster_avg_expr[[cluster_id]] <- pathway_avg
-  } else {
-    message("No gene sets processed for cluster: ", cluster_id)
-  }
-}
-
-return(list(
-  cluster_avg_expr = cluster_avg_expr,
-  enrichment_res = enrichment_res
-))
+  return(list(
+    cluster_avg_expr = cluster_avg_expr,
+    enrichment_res = enrichment_res
+  ))
 }
