@@ -83,7 +83,9 @@ calculate_avg_expression_nested <- function(exprs_mtx) {
   }
   
   top_20_pathways <- lapply(enrichment_res, function(cluster) {
-    cluster@result[1:20, ]
+    cluster_df <- data.frame(cluster@result)
+    top_20 <- cluster_df[1:20, ]
+    return(top_20)
   })
   
   top_20_pathways_GOBP <- lapply(top_20_pathways, function(pathway) {
